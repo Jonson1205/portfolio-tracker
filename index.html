@@ -309,7 +309,10 @@
           <label class="form-label">备注（可选）</label>
           <input class="form-input" id="txn-notes" placeholder="e.g. DCA">
         </div>
-        <button class="btn btn-primary" onclick="addTransaction()">添加交易</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="addTransaction()" style="flex:1;"><span id="txn-btn-text">添加交易</span></button>
+          <button class="btn" id="txn-cancel-edit" onclick="cancelEdit()" style="display:none;flex:0.4;background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);">取消</button>
+        </div>
       </div>
     </div>
     <!-- Log -->
@@ -319,24 +322,90 @@
     <!-- Import -->
     <div id="txn-import" style="display:none;">
       <div class="form-section">
-        <div class="form-title">从 CSV 导入</div>
-        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.8;">
-          <div style="font-weight:700;color:var(--accent);margin-bottom:6px;">列顺序要求:</div>
-          <div style="font-family:monospace;font-size:11px;color:var(--text);">date | ticker | market | action | type | units | price | div_tax</div>
+        <div class="segment" style="margin-bottom:12px;">
+          <button class="seg-btn active" onclick="switchImpSeg('csv')">📄 CSV</button>
+          <button class="seg-btn" onclick="switchImpSeg('ocr')">📷 截图识别</button>
         </div>
-        <button class="btn" onclick="downloadTemplate()" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);margin-bottom:12px;">↓ 下载 CSV 模板</button>
-        <div onclick="document.getElementById('import-file').click()" style="border:2px dashed var(--border);border-radius:12px;padding:28px 20px;text-align:center;cursor:pointer;margin-bottom:12px;">
-          <div style="font-size:28px;margin-bottom:8px;">📂</div>
-          <div style="font-size:14px;font-weight:600;">点击选择文件</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">支持 .csv</div>
+
+        <!-- CSV 导入 -->
+        <div id="imp-csv">
+          <div class="form-title">从 CSV 导入</div>
+          <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.8;">
+            <div style="font-weight:700;color:var(--accent);margin-bottom:6px;">列顺序要求:</div>
+            <div style="font-family:monospace;font-size:11px;color:var(--text);">date | ticker | market | action | type | units | price | div_tax</div>
+          </div>
+          <button class="btn" onclick="downloadTemplate()" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);margin-bottom:12px;">↓ 下载 CSV 模板</button>
+          <div onclick="document.getElementById('import-file').click()" style="border:2px dashed var(--border);border-radius:12px;padding:28px 20px;text-align:center;cursor:pointer;margin-bottom:12px;">
+            <div style="font-size:28px;margin-bottom:8px;">📂</div>
+            <div style="font-size:14px;font-weight:600;">点击选择 CSV 文件</div>
+          </div>
+          <input type="file" id="import-file" accept=".csv" style="display:none;" onchange="handleImportFile(this)">
+          <div id="import-preview" style="display:none;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">预览</div>
+            <div id="import-preview-list"></div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+              <button class="btn btn-primary" onclick="confirmImport()" id="import-confirm-btn">导入</button>
+              <button class="btn" onclick="cancelImport()" style="background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);">取消</button>
+            </div>
+          </div>
         </div>
-        <input type="file" id="import-file" accept=".csv" style="display:none;" onchange="handleImportFile(this)">
-        <div id="import-preview" style="display:none;">
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px;">预览</div>
-          <div id="import-preview-list"></div>
-          <div style="display:flex;gap:10px;margin-top:12px;">
-            <button class="btn btn-primary" onclick="confirmImport()" id="import-confirm-btn">导入</button>
-            <button class="btn" onclick="cancelImport()" style="background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);">取消</button>
+
+        <!-- 截图识别 -->
+        <div id="imp-ocr" style="display:none;">
+          <div class="form-title">📷 导入持仓</div>
+          <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.8;">
+            <div style="font-weight:700;color:var(--accent);margin-bottom:6px;">两种方式:</div>
+            📸 上传截图 = 自动识别（上传图片）<br>
+            📝 粘贴文本 = 直接复制 Moomoo 上的文字，更准确
+          </div>
+
+          <!-- 方式选择 -->
+          <div class="segment" style="margin-bottom:12px;">
+            <button class="seg-btn active" onclick="switchOCRMethod('upload')">📸 截图</button>
+            <button class="seg-btn" onclick="switchOCRMethod('paste')">📝 粘贴</button>
+          </div>
+
+          <!-- 上传截图 -->
+          <div id="ocr-method-upload">
+            <div onclick="document.getElementById('ocr-file').click()" id="ocr-zone" style="border:2px dashed var(--border);border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;margin-bottom:12px;transition:all 0.2s;">
+              <div style="font-size:48px;margin-bottom:8px;" id="ocr-icon">📸</div>
+              <div style="font-size:14px;font-weight:600;" id="ocr-text">点击上传截图</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px;">支持 .png .jpg</div>
+            </div>
+            <input type="file" id="ocr-file" accept=".png,.jpg,.jpeg" style="display:none;" onchange="handleOCR(this)">
+          </div>
+
+          <!-- 粘贴文本 -->
+          <div id="ocr-method-paste" style="display:none;">
+            <textarea id="ocr-paste-text" style="width:100%;height:160px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:10px;font-family:monospace;resize:vertical;" placeholder="从 Moomoo 复制持仓文字粘贴到这里...
+
+例如:
+1155.KL
+2,800 shares
+RM10.18
++RM4,247.00 +14.90%
+
+5176.KL
+13,800 shares
+RM2.31
++RM7,284.18 +27.16%"></textarea>
+            <button class="btn btn-primary" onclick="parsePastedText()" style="margin-top:10px;">🔍 解析粘贴的持仓</button>
+          </div>
+
+          <div id="ocr-loading" style="display:none;text-align:center;padding:20px;">
+            <div style="font-size:14px;color:var(--text2);">🔍 正在识别图片中的持仓数据...</div>
+            <div style="margin-top:10px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+              <div id="ocr-progress" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s;"></div>
+            </div>
+          </div>
+          <div id="ocr-preview" style="display:none;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">识别结果</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:8px;" id="ocr-raw"></div>
+            <div id="ocr-results"></div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+              <button class="btn btn-primary" onclick="confirmOCR()" id="ocr-confirm-btn">导入识别到的持仓</button>
+              <button class="btn" onclick="cancelOCR()" style="background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);">取消</button>
+            </div>
           </div>
         </div>
       </div>
@@ -639,55 +708,7 @@ function dbDelete(store, id) {
   });
 }
 
-// ── 同步云端数据 ──
-const GH_API = 'https://api.github.com/repos/Jonson1205/portfolio-tracker/contents/data/backup.json';
-const GH_TOKEN_KEY = 'gh_sync_token';
-
-function getSyncToken() { return localStorage.getItem(GH_TOKEN_KEY) || ''; }
-function setSyncToken(t) { localStorage.setItem(GH_TOKEN_KEY, t); }
-
-async function syncSave(data) {
-  // 电脑端：通过本地服务器
-  try {
-    await fetch('http://127.0.0.1:8899/sync/save', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return;
-  } catch(_) {}
-  // 手机端：直接调 GitHub API（需要 token）
-  const token = getSyncToken();
-  if (!token) return;
-  try {
-    const content = btoa(JSON.stringify(data));
-    let sha = '';
-    const r = await fetch(GH_API, { headers: { 'Authorization': `Bearer ${token}` } });
-    if (r.ok) { const d = await r.json(); sha = d.sha || ''; }
-    await fetch(GH_API, {
-      method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'sync', content, sha: sha || undefined })
-    });
-  } catch(_) {}
-}
-
-async function syncLoad() {
-  // 电脑端
-  try {
-    const resp = await fetch('http://127.0.0.1:8899/sync/load');
-    const data = await resp.json();
-    if (data && !data.empty && data.transactions) return data;
-  } catch(_) {}
-  // 手机端
-  const token = getSyncToken();
-  if (!token) return null;
-  try {
-    const resp = await fetch(GH_API, { headers: { 'Authorization': `Bearer ${token}` } });
-    if (!resp.ok) return null;
-    const d = await resp.json();
-    return JSON.parse(atob(d.content));
-  } catch(_) {}
-  return null;
-}
+// ── 保存到本地文件（通过本地服务器）──
 const SAVE_URL = 'http://127.0.0.1:8899/save';
 
 async function saveToFile() {
@@ -712,15 +733,24 @@ async function saveToLocalStorage() {
     localStorage.setItem('portfolio_backup', JSON.stringify({
       transactions: txns, dividends: divs, savedAt: new Date().toISOString()
     }));
-    // 同时保存到桌面文件 + GitHub
+    // 同时保存到桌面文件
     saveToFile();
-    // 同步到云端（通过 Worker）
-    const txns2 = await dbGetAll('transactions');
-    const divs2 = await dbGetAll('dividends');
-    if (txns2.length > 0 || divs2.length > 0) {
-      syncSave({ transactions: txns2, dividends: divs2, savedAt: new Date().toISOString() });
-    }
   } catch(_) {}
+}
+
+// ── 现金管理 ──
+function getCash(account) { return parseFloat(localStorage.getItem('cash_' + account)) || 0; }
+function setCash(account, val) { localStorage.setItem('cash_' + account, String(val)); }
+
+function editCash(account, name) {
+  const current = getCash(account);
+  const input = prompt(`输入${name}现金余额 (USD):`, current);
+  if (input === null) return;
+  const val = parseFloat(input);
+  if (isNaN(val) || val < 0) { showToast('请输入有效金额', true); return; }
+  setCash(account, val);
+  renderDashboard();
+  showToast(`✅ ${name}现金已更新`);
 }
 
 /** 从旧版格式转换为新版格式 */
@@ -744,50 +774,6 @@ function convertOldFormat(old) {
     createdAt: old.createdAt || Date.now(),
   };
 }
-
-// ── 从 GitHub 拉取并合并新数据 ──
-let lastSyncCheck = 0;
-
-async function syncFromGitHub() {
-  const now = Date.now();
-  if (now - lastSyncCheck < 2000) return;
-  lastSyncCheck = now;
-  const gitData = await syncLoad();
-  if (!gitData?.transactions) return;
-  const gitTime = new Date(gitData.savedAt || 0).getTime();
-
-  // 看看本地有没有更新的数据
-  const localStr = localStorage.getItem('portfolio_backup');
-  const localTime = localStr ? new Date(JSON.parse(localStr).savedAt || 0).getTime() : 0;
-
-  if (gitTime > localTime) {
-    // GitHub 有更新 → 替换本地数据
-    const restoreTxns = (gitData.transactions || []).map(t =>
-      (t.symbol && !t.ticker) ? convertOldFormat(t) : t
-    );
-    // 清空本地
-    const oldTxns = await dbGetAll('transactions');
-    const oldDivs = await dbGetAll('dividends');
-    for (const t of oldTxns) await dbDelete('transactions', t.id);
-    for (const d of oldDivs) await dbDelete('dividends', d.id);
-    // 写入 GitHub 的数据
-    for (const t of restoreTxns) await dbAdd('transactions', t);
-    for (const d of (gitData.dividends || [])) await dbAdd('dividends', d);
-    // 更新本地缓存时间戳
-    localStorage.setItem('portfolio_backup', JSON.stringify(gitData));
-    renderDashboard();
-    showToast('📡 已同步云端最新数据');
-  }
-}
-
-// ── 定时检查 GitHub 更新（每3秒）──
-setInterval(syncFromGitHub, 3000);
-
-// ── 切换到标签页或窗口聚焦时也检查 ──
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) syncFromGitHub();
-});
-window.addEventListener('focus', syncFromGitHub);
 
 /** 从备份文件恢复数据 */
 function restoreFromBackup() {
@@ -863,23 +849,13 @@ async function exportBackup() {
   } catch(_) {}
 }
 
-/** 备份/恢复/同步菜单 */
+/** 备份/恢复菜单 */
 function showBackupMenu() {
-  const hasToken = getSyncToken();
-  const msg = hasToken
-    ? `🔑 云端同步已连接\n\n🔄 点「确定」= 导出备份到 Downloads\n♻️ 点「取消」= 从文件恢复\n📝 输入新 token = 更换同步密钥`
-    : '⚠️ 未设置同步密钥 — 手机端需要输入 token\n\n🔄 点「确定」= 导出备份\n♻️ 点「取消」= 从文件恢复\n📝 输入 token = 开启手机同步';
-
-  const input = prompt(msg + '\n\n📝 输入 GitHub Token 开启同步:');
-  if (input === null) {
-    restoreFromBackup(); // 取消 → 恢复
-  } else if (input === '') {
-    exportBackup(); // 确定 → 导出
-  } else if (input) {
-    setSyncToken(input);
-    showToast('✅ 同步密钥已保存');
-    // 立即触发一次同步
-    syncFromGitHub();
+  const action = confirm('🔄 点「确定」= 导出备份到 Downloads\n♻️ 点「取消」= 从备份文件恢复');
+  if (action) {
+    exportBackup();
+  } else {
+    restoreFromBackup();
   }
 }
 
@@ -941,6 +917,9 @@ function toggleDivTax() {
 }
 
 // ── TRANSACTIONS ──
+// ── 编辑状态 ──
+let editingTxnId = null;
+
 async function addTransaction() {
   const ticker = document.getElementById('txn-ticker').value.trim().toUpperCase();
   const market = document.getElementById('txn-market').value;
@@ -956,15 +935,29 @@ async function addTransaction() {
     showToast('请填写所有必填字段', true); return;
   }
 
-  const existing = await dbGetAll('transactions');
-  const prev = existing.find(t => t.ticker === ticker);
-  if (prev) {
-    if (prev.type !== type) { showToast(ticker + ' 已经是 ' + prev.type + ' 类型，不能更改', true); return; }
-    if (prev.market !== market) { showToast(ticker + ' 已经是 ' + prev.market + ' 市场，不能更改', true); return; }
+  // 编辑模式：更新现有记录
+  if (editingTxnId) {
+    const all = await dbGetAll('transactions');
+    const old = all.find(x => x.id === editingTxnId);
+    if (old) {
+      await dbDelete('transactions', editingTxnId);
+      await dbAdd('transactions', { ticker, market, action, type, units, price, date, notes, divTax, createdAt: old.createdAt });
+      showToast('✅ 交易已更新');
+    }
+    editingTxnId = null;
+    document.getElementById('txn-btn-text').textContent = '添加交易';
+    document.getElementById('txn-cancel-edit').style.display = 'none';
+  } else {
+    // 新增模式
+    const existing = await dbGetAll('transactions');
+    const prev = existing.find(t => t.ticker === ticker);
+    if (prev) {
+      if (prev.type !== type) { showToast(ticker + ' 已经是 ' + prev.type + ' 类型，不能更改', true); return; }
+      if (prev.market !== market) { showToast(ticker + ' 已经是 ' + prev.market + ' 市场，不能更改', true); return; }
+    }
+    await dbAdd('transactions', { ticker, market, action, type, units, price, date, notes, divTax, createdAt: Date.now() });
+    showToast((action === 'buy' ? '买入' : '卖出') + ' ' + ticker + ' 成功！');
   }
-
-  await dbAdd('transactions', { ticker, market, action, type, units, price, date, notes, divTax, createdAt: Date.now() });
-  showToast((action === 'buy' ? '买入' : '卖出') + ' ' + ticker + ' 成功！');
 
   // Reset form
   ['txn-ticker','txn-units','txn-price','txn-notes','txn-tax'].forEach(id => document.getElementById(id).value = '');
@@ -974,6 +967,8 @@ async function addTransaction() {
   document.getElementById('txn-price').readOnly = false;
   document.getElementById('epf-info-banner').style.display = 'none';
   toggleDivTax();
+  renderTxnLog();
+  renderDashboard();
 }
 
 async function renderTxnLog() {
@@ -991,11 +986,49 @@ async function renderTxnLog() {
       <div class="log-right">
         <div class="log-amount ${t.action==='buy'?'neg':'pos'}">${t.action==='buy'?'-':'+'}${fmt(t.units*t.price, t.market)}</div>
         <div class="tag tag-${t.type}">${t.type}</div>
+        <button class="btn btn-danger" onclick="editTxn(${t.id})" style="background:rgba(59,130,246,0.1);color:var(--accent);border:1px solid rgba(59,130,246,0.2);padding:4px 12px;width:auto;font-size:11px;border-radius:6px;cursor:pointer;">编辑</button>
         <button class="btn btn-danger" onclick="deleteTxn(${t.id})">删除</button>
       </div>
     </div>`).join('');
 }
 async function deleteTxn(id) { await dbDelete('transactions', id); renderTxnLog(); showToast('交易已删除'); }
+
+/** 编辑交易记录 */
+async function editTxn(id) {
+  const all = await dbGetAll('transactions');
+  const t = all.find(x => x.id === id);
+  if (!t) return;
+
+  editingTxnId = id;
+  // 填充表单
+  document.getElementById('txn-ticker').value = t.ticker;
+  document.getElementById('txn-market').value = t.market;
+  document.getElementById('txn-action').value = t.action;
+  document.getElementById('txn-type').value = t.type;
+  document.getElementById('txn-units').value = t.units;
+  document.getElementById('txn-price').value = t.price;
+  document.getElementById('txn-date').value = t.date;
+  document.getElementById('txn-notes').value = t.notes || '';
+  if (t.type === 'dividend') {
+    document.getElementById('txn-tax-group').style.display = 'block';
+    document.getElementById('txn-tax').value = t.divTax || 0;
+  }
+  // 切换编辑状态
+  document.getElementById('txn-btn-text').textContent = '更新交易';
+  document.getElementById('txn-cancel-edit').style.display = '';
+  // 切换到添加 tab
+  switchSeg('txn', 'add');
+}
+
+function cancelEdit() {
+  editingTxnId = null;
+  document.getElementById('txn-btn-text').textContent = '添加交易';
+  document.getElementById('txn-cancel-edit').style.display = 'none';
+  // 清空表单
+  ['txn-ticker','txn-units','txn-price','txn-notes','txn-tax'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('txn-date').value = today();
+  document.getElementById('txn-market').value = 'US';
+}
 
 // ── DIVIDENDS ──
 async function addDividend() {
@@ -1161,7 +1194,10 @@ async function renderDashboard() {
   const hkVal = active.filter(h=>h.market==='HK').reduce((s,h)=>{ const {curVal}=calcStock(h); return s+(curVal??h.costBasis); },0);
 
   const totalPLRM = active.reduce((s,h)=>{ const {unrealised,realised}=calcStock(h); return s+toRM((unrealised??0)+realised,h.market)+toRM(divMap[h.ticker]||0,h.market); },0);
-  const totalValRM = myVal+epfVal+(usVal*rate)+(sgVal*sgdRate)+(ukVal*gbpRate)+(hkVal*hkdRate);
+  const cashDividend = getCash('dividend');
+  const cashGrowth = getCash('growth');
+  const totalCashRM = (cashDividend + cashGrowth) * rate;
+  const totalValRM = myVal+epfVal+(usVal*rate)+(sgVal*sgdRate)+(ukVal*gbpRate)+(hkVal*hkdRate) + totalCashRM;
   const totalCost = active.reduce((s,h)=>s+toRM(h.costBasis,h.market),0);
   const totalPLPct = totalCost ? (totalPLRM/totalCost*100) : 0;
   const now = new Date().toLocaleString('en-MY',{dateStyle:'medium',timeStyle:'short'});
@@ -1202,9 +1238,13 @@ async function renderDashboard() {
           <div class="acc-pl"><span class="${cc(divPL)}">${divPL>=0?'+':'-'}RM${Math.abs(divPL).toLocaleString('en',{minFrac:2,maxFrac:2})}</span><span class="${cc(divPLPct)}">${divPLPct>=0?'+':''}${divPLPct.toFixed(2)}%</span></div>
           <div class="acc-ann-pct">${divEstYieldPct>0?divEstYieldPct.toFixed(2)+'%':''}</div>
         </div>
+        <div class="acc-head-row" style="align-items:baseline;margin-top:6px;padding-top:6px;border-top:1px solid rgba(48,54,61,0.3);">
+          <span style="font-size:11px;color:var(--text2);">💵 现金</span>
+          <span onclick="editCash('dividend','股息账户')" style="font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;" title="点击修改">$${cashDividend.toFixed(2)} ✏️</span>
+        </div>
       </div>
-      <div class="col-head col-div"><span>STOCKS</span><span>P/L (%)</span><span>CAP GAIN / DV</span><span>LIVE / AVG</span></div>
-      ${buildDivRows(divStocks)}
+      <div class="col-head col-div">${sortHeader('STOCKS','ticker')}${sortHeader('P/L','pl')}${sortHeader('CAP GAIN / DV','plPct')}${sortHeader('LIVE / AVG','price')}</div>
+      ${buildDivRows(sortStocks(divStocks, divMap, calcStock))}
     </div>`;
   }
 
@@ -1219,16 +1259,262 @@ async function renderDashboard() {
         <div class="acc-head-row" style="align-items:baseline;"><div class="acc-type">增长账户</div></div>
         <div class="acc-head-row" style="align-items:baseline;margin-top:2px;"><div class="acc-val">RM${grwCurVal.toLocaleString('en',{minFrac:2,maxFrac:2})}</div></div>
         <div class="acc-pl" style="margin-top:4px;"><span class="${cc(grwPL)}">${grwPL>=0?'+':'-'}RM${Math.abs(grwPL).toLocaleString('en',{minFrac:2,maxFrac:2})}</span><span class="${cc(grwPLPct)}">${grwPLPct>=0?'+':''}${grwPLPct.toFixed(2)}%</span></div>
+        <div class="acc-head-row" style="align-items:baseline;margin-top:6px;padding-top:6px;border-top:1px solid rgba(48,54,61,0.3);">
+          <span style="font-size:11px;color:var(--text2);">💵 现金</span>
+          <span onclick="editCash('growth','增长账户')" style="font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;" title="点击修改">$${cashGrowth.toFixed(2)} ✏️</span>
+        </div>
       </div>
-      <div class="col-head col-grow"><span>STOCKS</span><span>P/L (%)</span><span>LIVE / AVG</span><span>VALUE</span></div>
-      ${buildGrwRows(grwStocks)}
+      <div class="col-head col-grow">${sortHeader('STOCKS','ticker')}${sortHeader('P/L','pl')}${sortHeader('LIVE / AVG','price')}${sortHeader('VALUE','value')}</div>
+      ${buildGrwRows(sortStocks(grwStocks, divMap, calcStock))}
     </div>`;
   }
 
   el.innerHTML = html;
 }
 
-// ── IMPORT ──
+// ── 排序状态 ──
+let sortBy = 'pl';
+let sortAsc = false;
+
+function toggleSort(col) {
+  if (sortBy === col) sortAsc = !sortAsc;
+  else { sortBy = col; sortAsc = col === 'name' || col === 'ticker'; }
+  renderDashboard();
+}
+
+function sortStocks(stocks, dm, cs) {
+  return [...stocks].sort((a, b) => {
+    const hA = cs(a), hB = cs(b);
+    let va, vb;
+    switch (sortBy) {
+      case 'ticker': va = a.ticker; vb = b.ticker; break;
+      case 'pl': va = (hA.pl ?? 0) + (dm[a.ticker] || 0); vb = (hB.pl ?? 0) + (dm[b.ticker] || 0); break;
+      case 'plPct': va = hA.plPct ?? 0; vb = hB.plPct ?? 0; break;
+      case 'price': va = hA.livePrice ?? 0; vb = hB.livePrice ?? 0; break;
+      case 'value': va = hA.curVal ?? 0; vb = hB.curVal ?? 0; break;
+      default: va = 0; vb = 0;
+    }
+    return sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+}
+
+function sortArrow(col) {
+  if (sortBy !== col) return '';
+  return sortAsc ? ' ▲' : ' ▼';
+}
+
+function sortHeader(label, col) {
+  return `<span onclick="toggleSort('${col}')" style="cursor:pointer;">${label}${sortArrow(col)}</span>`;
+}
+
+// ── 导入分段切换 ──
+function switchImpSeg(tab) {
+  document.getElementById('imp-csv').style.display = tab === 'csv' ? 'block' : 'none';
+  document.getElementById('imp-ocr').style.display = tab === 'ocr' ? 'block' : 'none';
+  document.querySelectorAll('#txn-import .seg-btn').forEach((b, i) => b.classList.toggle('active', (i === 0 && tab === 'csv') || (i === 1 && tab === 'ocr')));
+}
+
+// ── OCR 截图识别 ──
+let ocrResults = [];
+
+async function handleOCR(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // 显示上传图片预览
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const imgData = e.target.result;
+    document.getElementById('ocr-icon').textContent = '✅';
+    document.getElementById('ocr-text').textContent = '图片已上传，正在识别...';
+    document.getElementById('ocr-loading').style.display = 'block';
+
+    // 加载 Tesseract.js
+    if (typeof Tesseract === 'undefined') {
+      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+    }
+
+    try {
+      const result = await Tesseract.recognize(imgData, 'eng+chi_sim', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            document.getElementById('ocr-progress').style.width = (m.progress * 100) + '%';
+          }
+        }
+      });
+
+      const text = result.data.text;
+      document.getElementById('ocr-raw').textContent = '原始文本: ' + text.slice(0, 300) + (text.length > 300 ? '...' : '');
+      document.getElementById('ocr-loading').style.display = 'none';
+
+      // 解析持仓数据
+      ocrResults = parsePositions(text);
+      renderOCRResults();
+    } catch (err) {
+      document.getElementById('ocr-loading').style.display = 'none';
+      document.getElementById('ocr-text').textContent = '❌ 识别失败，请重试';
+      ocrResults = [];
+      showToast('OCR 识别失败: ' + err.message, true);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function parsePositions(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  const results = [];
+
+  // 匹配模式：股票代码 + 数量 + 价格
+  // 例如: "1155.KL 2,800 shares RM10.18" 或 "AAPL 18.40 shares $434.79"
+  let currentTicker = null;
+  let currentShares = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // 匹配股票代码: 字母数字.XX 或纯字母 (AAPL, MSFT, 1155.KL)
+    const tickerMatch = line.match(/\b([A-Z0-9]+(?:\.[A-Z]{2})?)\b/);
+    // 匹配数量 (数字 + shares/股/units)
+    const sharesMatch = line.match(/([\d,]+\.?\d*)\s*(?:shares|股|units|sa)?/i);
+    // 匹配价格 (RM/USD/$ + 数字, 或 数字 + .KL 后的数字)
+    const priceMatch = line.match(/(?:RM|\$|USD)?\s*([\d]+\.\d{2,})/);
+
+    // 尝试识别股票代码行
+    if (tickerMatch) {
+      const ticker = tickerMatch[1];
+      // 过滤掉常见的非股票词
+      if (!['RM', 'USD', 'MYR', 'TOTAL', 'DIVIDEND', 'GROWTH', 'ACC', 'SHARES', 'SHARE', 'LIVE', 'AVG', 'COST', 'PRICE', 'DASHBOARD', 'JEPQ'].includes(ticker)) {
+        currentTicker = ticker;
+        continue;
+      }
+    }
+
+    // 如果有股票代码待定，尝试从后续行提取数量
+    if (currentTicker && sharesMatch) {
+      currentShares = parseFloat(sharesMatch[1].replace(/,/g, ''));
+      // 找价格 - 可以在同1行或后2行内
+      let price = null;
+      for (let j = Math.max(0, i - 1); j <= Math.min(lines.length - 1, i + 2); j++) {
+        const p = lines[j].match(/(?:RM|\$|USD)\s*([\d]+\.\d{2,})/);
+        if (p) { price = parseFloat(p[1]); break; }
+      }
+      if (price || currentShares) {
+        const isUSD = lines.slice(i - 1, i + 2).join(' ').includes('$');
+        results.push({
+          ticker: currentTicker,
+          shares: currentShares || 0,
+          price: price || 0,
+          market: isUSD ? 'US' : 'MY',
+          type: 'dividend', // 默认
+          date: new Date().toISOString().split('T')[0],
+        });
+        currentTicker = null;
+        currentShares = null;
+      }
+    }
+  }
+
+  return results;
+}
+
+function renderOCRResults() {
+  const container = document.getElementById('ocr-results');
+  const preview = document.getElementById('ocr-preview');
+
+  if (ocrResults.length === 0) {
+    container.innerHTML = '<div style="padding:12px;color:var(--text2);font-size:13px;text-align:center;">⚠️ 未能识别出持仓数据，试试 CSV 导入</div>';
+    preview.style.display = 'block';
+    document.getElementById('ocr-confirm-btn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('ocr-confirm-btn').style.display = '';
+  preview.style.display = 'block';
+  document.getElementById('ocr-text').textContent = '✅ 已识别 ' + ocrResults.length + ' 条持仓';
+
+  container.innerHTML = ocrResults.map((r, i) => `
+    <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:700;color:var(--text);">${r.ticker}</span>
+        <span style="color:var(--text2);">${r.market}</span>
+      </div>
+      <div style="margin-top:4px;color:var(--text2);">
+        数量: ${r.shares} 股 · 价格: ${r.market === 'US' ? '$' : 'RM'}${r.price.toFixed(2)} · 类型: ${r.type === 'dividend' ? '股息' : '增长'}
+      </div>
+      <div style="margin-top:4px;display:flex;gap:6px;align-items:center;">
+        <input style="width:80px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;" type="number" step="any" value="${r.shares}" onchange="ocrResults[${i}].shares=parseFloat(this.value)||0">
+        <span style="font-size:10px;color:var(--text2);">股</span>
+        <input style="width:80px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;" type="number" step="any" value="${r.price}" onchange="ocrResults[${i}].price=parseFloat(this.value)||0">
+        <select style="padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;" onchange="ocrResults[${i}].type=this.value">
+          <option value="dividend" ${r.type==='dividend'?'selected':''}>股息</option>
+          <option value="growth" ${r.type==='growth'?'selected':''}>增长</option>
+        </select>
+      </div>
+    </div>`).join('');
+}
+
+async function confirmOCR() {
+  if (ocrResults.length === 0) return;
+  const btn = document.getElementById('ocr-confirm-btn');
+  btn.disabled = true; btn.textContent = '导入中...';
+
+  for (const r of ocrResults) {
+    await dbAdd('transactions', {
+      ticker: r.ticker,
+      market: r.market,
+      action: 'buy',
+      type: r.type,
+      units: r.shares,
+      price: r.price,
+      date: r.date,
+      notes: '从截图导入',
+      divTax: r.market === 'US' ? 30 : 0,
+      createdAt: Date.now(),
+    });
+  }
+  showToast(`✅ 已导入 ${ocrResults.length} 条持仓`);
+  ocrResults = [];
+  document.getElementById('ocr-preview').style.display = 'none';
+  document.getElementById('ocr-file').value = '';
+  document.getElementById('ocr-icon').textContent = '📸';
+  document.getElementById('ocr-text').textContent = '点击上传截图';
+  btn.disabled = false; btn.textContent = '导入识别到的持仓';
+  renderDashboard();
+  renderTxnLog();
+}
+
+function cancelOCR() {
+  ocrResults = [];
+  document.getElementById('ocr-preview').style.display = 'none';
+  document.getElementById('ocr-file').value = '';
+  document.getElementById('ocr-icon').textContent = '📸';
+  document.getElementById('ocr-text').textContent = '点击上传截图';
+}
+
+/** 切换截图/粘贴方式 */
+function switchOCRMethod(method) {
+  document.getElementById('ocr-method-upload').style.display = method === 'upload' ? 'block' : 'none';
+  document.getElementById('ocr-method-paste').style.display = method === 'paste' ? 'block' : 'none';
+  document.querySelectorAll('#imp-ocr .segment .seg-btn').forEach((b, i) => b.classList.toggle('active', (i === 0 && method === 'upload') || (i === 1 && method === 'paste')));
+}
+
+/** 解析粘贴的文本 */
+function parsePastedText() {
+  const text = document.getElementById('ocr-paste-text').value;
+  if (!text.trim()) { showToast('请先粘贴持仓数据', true); return; }
+  ocrResults = parsePositions(text);
+  renderOCRResults();
+}
+
+function loadScript(url) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = url; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// ── CSV Import ──
 let importRows = [];
 function downloadTemplate() {
   const csv = `date,ticker,market,action,type,units,price,div_tax\n2024-01-15,AAPL,US,buy,growth,10,180.00,\n2024-01-15,JEPQ,US,buy,dividend,100,45.00,30`;
@@ -1259,10 +1545,81 @@ function handleImportFile(input) {
     let rows=e.target.result.trim().split('\n').map(l=>{const c=[];let cur='',inq=false;for(let ch of l){if(ch==='"')inq=!inq;else if(ch===','&&!inq){c.push(cur.trim());cur='';}else cur+=ch;}c.push(cur.trim());return c;});
     if (rows.length&&isNaN(rows[0][0])&&String(rows[0][0]).toLowerCase().includes('date')) rows=rows.slice(1);
     rows=rows.filter(r=>r.some(c=>c!==''&&c!==null&&c!==undefined));
-    importRows=rows.map((r,i)=>({rowNum:i+2,...parseImportRow(r)}));
+
+    // 检测是否为 Moomoo 格式（包含 Symbol/代码 列头）
+    const header = rows[0]?.join(',').toLowerCase() || '';
+    if (header.includes('symbol') || header.includes('代码') || header.includes('ticker')) {
+      importRows = parseMoomooCSV(rows);
+    } else {
+      importRows=rows.map((r,i)=>({rowNum:i+2,...parseImportRow(r)}));
+    }
     renderImportPreview();
   };
   reader.readAsText(file);
+}
+
+/** 解析 Moomoo 导出的 CSV */
+function parseMoomooCSV(rows) {
+  if (rows.length < 2) return [];
+  const header = rows[0].map(h => h.toLowerCase().trim());
+  // 找列索引
+  const idx = (names) => {
+    for (const n of names) {
+      const i = header.findIndex(h => h.includes(n));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const colSymbol = idx(['symbol', '代码', 'ticker']);
+  const colName = idx(['name', '名称', 'stock name']);
+  const colQty = idx(['quantity', '数量', 'shares', 'qty', 'holdings', '持仓']);
+  const colPrice = idx(['market price', '市价', 'last price', 'price', '现价', '最新价']);
+  const colCost = idx(['cost price', '成本价', 'avg cost', 'average cost', '均价']);
+  const colMarket = idx(['market', 'exchange', '交易所']);
+
+  const results = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const ticker = (r[colSymbol] || '').trim().toUpperCase();
+    if (!ticker) continue;
+
+    const qty = parseFloat((r[colQty] || '').replace(/,/g, ''));
+    const price = parseFloat((r[colPrice] || '').replace(/,/g, ''));
+    const cost = parseFloat((r[colCost] || '').replace(/,/g, ''));
+
+    // 判断市场
+    let market = 'US';
+    if (ticker.endsWith('.KL') || ticker.endsWith('.SI') || ticker.endsWith('.L') || ticker.endsWith('.HK')) {
+      if (ticker.endsWith('.KL')) market = 'MY';
+      else if (ticker.endsWith('.SI')) market = 'SG';
+      else if (ticker.endsWith('.L')) market = 'UK';
+      else if (ticker.endsWith('.HK')) market = 'HK';
+    } else if (colMarket >= 0) {
+      const mkt = (r[colMarket] || '').toUpperCase();
+      if (mkt.includes('MY') || mkt.includes('KL')) market = 'MY';
+      else if (mkt.includes('SG')) market = 'SG';
+    }
+
+    const buyPrice = (cost || price || 0);
+    if (qty && buyPrice) {
+      results.push({
+        valid: true, errors: [],
+        data: {
+          date: new Date().toISOString().split('T')[0],
+          ticker,
+          market,
+          action: 'buy',
+          type: 'growth',
+          units: qty,
+          price: buyPrice,
+          divTax: market === 'US' ? 30 : 0,
+          createdAt: Date.now(),
+          notes: r[colName] || '',
+        }
+      });
+    }
+  }
+  return results;
 }
 function renderImportPreview() {
   const preview=document.getElementById('import-preview'),list=document.getElementById('import-preview-list');
@@ -1457,11 +1814,6 @@ openDB().then(async () => {
       if (fileData && !fileData.empty && !fileData.error) {
         restoreData = fileData;
       }
-    } catch(_) {}
-    // 再从云端同步
-    try {
-      const gitData = await syncLoad();
-      if (gitData) restoreData = gitData;
     } catch(_) {}
 
     if (restoreData) {
