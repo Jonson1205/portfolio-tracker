@@ -512,6 +512,16 @@ RM2.31
 
 <div class="toast" id="toast"></div>
 
+<!-- ════════════════════════ LOCK SCREEN ════════════════════════ -->
+<div id="lock-screen" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#0d1117 0%,#162032 100%);justify-content:center;align-items:center;flex-direction:column;gap:16px;">
+  <div style="font-size:48px;">📊</div>
+  <div style="font-size:20px;font-weight:700;color:var(--text);">我的投资组合</div>
+  <div style="font-size:13px;color:var(--text2);" id="lock-msg">输入密码解锁</div>
+  <input type="password" id="lock-input" style="width:220px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:16px;text-align:center;outline:none;" placeholder="输入密码" onkeydown="if(event.key==='Enter')checkPassword()">
+  <button onclick="checkPassword()" style="padding:10px 40px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">解锁</button>
+  <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;max-width:300px;" id="lock-hint">首次使用请设置密码</div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════════════
 //  CONFIG — 实时股价数据源
@@ -1791,8 +1801,46 @@ function renderDivImportPreview(){const preview=document.getElementById('div-imp
 async function confirmDivImport(){const btn=document.getElementById('div-import-confirm-btn');if(btn.disabled)return;btn.disabled=true;btn.textContent='导入中...';const valid=divImportRows.filter(r=>r.valid).map(r=>r.data);if(!valid.length){showToast('没有有效数据',true);btn.disabled=false;return;}for(const row of valid)await dbAdd('dividends',row);showToast('✓ 成功导入 '+valid.length+' 条股息记录！');divImportRows=[];document.getElementById('div-import-preview').style.display='none';document.getElementById('div-import-file').value='';switchSeg('div','log');}
 function cancelDivImport(){divImportRows=[];document.getElementById('div-import-preview').style.display='none';document.getElementById('div-import-file').value='';}
 
+// ── 密码锁 ──
+function hashPw(pw) {
+  let h = 0;
+  for (let i = 0; i < pw.length; i++) { h = ((h << 5) - h) + pw.charCodeAt(i); h |= 0; }
+  return 'h' + Math.abs(h).toString(36);
+}
+
+function checkPassword() {
+  const input = document.getElementById('lock-input').value;
+  const stored = localStorage.getItem('portfolio_pw');
+  if (!stored) {
+    if (input.length < 3) { showToast('密码至少3位', true); return; }
+    localStorage.setItem('portfolio_pw', hashPw(input));
+    document.getElementById('lock-screen').style.display = 'none';
+    showToast('✅ 密码已设置');
+    return;
+  }
+  if (hashPw(input) === stored) {
+    document.getElementById('lock-screen').style.display = 'none';
+  } else {
+    showToast('❌ 密码错误', true);
+    document.getElementById('lock-input').value = '';
+  }
+}
+
+function lockApp() {
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.getElementById('lock-input').value = '';
+  document.getElementById('lock-input').focus();
+  const hasPw = localStorage.getItem('portfolio_pw');
+  document.getElementById('lock-msg').textContent = hasPw ? '输入密码解锁' : '设置密码';
+  document.getElementById('lock-hint').textContent = hasPw ? '' : '输入密码后点解锁，下次打开需要输入';
+}
+
 // ── INIT ──
 openDB().then(async () => {
+  // 密码锁
+  if (localStorage.getItem('portfolio_pw')) lockApp();
+  document.getElementById('lock-input').focus();
+
   document.getElementById('txn-date').value = today();
   document.getElementById('div-date').value = today().slice(0, 7);
   await renderDashboard();
