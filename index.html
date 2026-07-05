@@ -1837,8 +1837,8 @@ function lockApp() {
 
 // ── INIT ──
 openDB().then(async () => {
-  // 密码锁
-  if (localStorage.getItem('portfolio_pw')) lockApp();
+  // 密码锁（首次设置，之后解锁）
+  lockApp();
   document.getElementById('lock-input').focus();
 
   document.getElementById('txn-date').value = today();
